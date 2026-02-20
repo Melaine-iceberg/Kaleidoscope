@@ -21,16 +21,37 @@ This is a refactored version of the Kaleidoscope compiler from the LLVM tutorial
 
 Requirements:
 
-- CMake 4.10+
+- CMake 3.26+（已在本项目中使用）
 - C++23 compatible compiler
-- Visual Studio 2026 (for Windows build)
+- LLVM（建议使用 MSYS2 clang64 或官方 LLVM 二进制包）
+- Ninja（若不在 PATH，需要显式指定 CMAKE_MAKE_PROGRAM）
 
-Build steps:
+### 推荐（Windows + MSYS2 clang64）
+
+前置：已安装并配置 `C:\msys64\clang64`。
 
 ```bash
-cd Kaleidoscope
-cmake -G "Visual Studio 18 2026" .
-cmake --build .
+cmake -S . -B out/build/msys64-clang -G Ninja ^
+  -DMSYS_CLANG64_ROOT=C:/msys64/clang64 ^
+  -DCMAKE_MAKE_PROGRAM="C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe"
+cmake --build out/build/msys64-clang
+```
+
+说明：
+
+- 会自动使用 `C:\msys64\clang64\bin\clang++.exe`
+- LLVM 会从 `C:\msys64\clang64\lib\cmake\llvm` 读取
+- ZLIB 会从 `C:\msys64\clang64` 解析
+
+### 备选（Windows + LLVM 官方二进制包）
+
+前置：已安装到 `C:\LLVM`，并确保 clang++ 与 llvm-rc 可用。
+
+```bash
+cmake -S . -B out/build/clang-ninja -G Ninja ^
+  -DCMAKE_CXX_COMPILER=C:/LLVM/bin/clang++.exe ^
+  -DCMAKE_RC_COMPILER=C:/LLVM/bin/llvm-rc.exe
+cmake --build out/build/clang-ninja
 ```
 
 ## Usage
