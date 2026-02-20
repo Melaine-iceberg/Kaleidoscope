@@ -191,7 +191,7 @@ std::unique_ptr<PrototypeAst> ParsePrototype() {
       break;
     case Token::k_tok_binary:
       get_next_token();
-      if (!isascii(cur_tok)) {
+      if (!isascii(static_cast<int>(cur_tok))) {
         return LogErrorP("Expected binary operator");
       }
       fn_name = "binary";
@@ -293,7 +293,7 @@ void InitializeBinopPrecedence() {
 ///   ::= '!' unary
 static std::unique_ptr<ExprAST> ParseUnary() {
   // If the current token is not an operator, it must be a primary expr.
-  if (!isascii(cur_tok) || cur_tok == static_cast<Token>('(') ||
+  if (!isascii(static_cast<int>(cur_tok)) || cur_tok == static_cast<Token>('(') ||
       cur_tok == Token::k_tok_identifier || cur_tok == Token::k_tok_number)
     return ParsePrimary();
 
