@@ -1,4 +1,4 @@
-# Kaleidoscope Compiler
+﻿# Kaleidoscope Compiler
 
 This is a refactored version of the Kaleidoscope compiler from the LLVM tutorial. The code has been organized into multiple files for better maintainability.
 
@@ -52,6 +52,29 @@ cmake -S . -B out/build/clang-ninja -G Ninja ^
   -DCMAKE_CXX_COMPILER=C:/LLVM/bin/clang++.exe ^
   -DCMAKE_RC_COMPILER=C:/LLVM/bin/llvm-rc.exe
 cmake --build out/build/clang-ninja
+```
+
+### WSL2 Fedora + Visual Studio 2026
+
+前置：在 WSL2 Fedora 中安装依赖：
+
+```bash
+sudo dnf install clang llvm-devel libcxx-devel libcxxabi-devel zlib-devel cmake ninja-build gdb rsync zip
+```
+
+**方法 A — VS 2026 打开文件夹（推荐）**
+
+1. 在 VS 中选择 **File → Open → Folder**，打开项目根目录
+2. VS 自动识别 `CMakePresets.json`
+3. 在 **Target System** 下拉框选择 `WSL: FedoraLinux-43`
+4. 在 **Configure Preset** 下拉框选择 `Linux Clang Release (libc++)` 或 `Linux Clang Debug (libc++)`
+5. 正常构建即可
+
+**方法 B — WSL2 命令行**
+
+```bash
+cmake --preset linux-clang-release
+cmake --build --preset linux-clang-release
 ```
 
 ## Usage

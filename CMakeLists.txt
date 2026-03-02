@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+﻿cmake_minimum_required(VERSION 3.26)
 
 if(CMAKE_GENERATOR MATCHES "Visual Studio")
     message(FATAL_ERROR "Visual Studio 生成器会产生 .slnx，请改用 Ninja 或 Unix Makefiles。")
@@ -65,7 +65,11 @@ set(_extra_stdlib_libs "")
 if(USE_LIBCXX AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC)
     list(APPEND _extra_stdlib_flags -stdlib=libc++)
     if(NOT APPLE)
-        find_library(LIBCXXABI c++abi libc++abi PATHS ${LIBCXX_LIB_DIR} NO_DEFAULT_PATH)
+        if(LIBCXX_LIB_DIR)
+            find_library(LIBCXXABI c++abi libc++abi PATHS ${LIBCXX_LIB_DIR} NO_DEFAULT_PATH)
+        else()
+            find_library(LIBCXXABI c++abi)
+        endif()
         if(LIBCXXABI)
             list(APPEND _extra_stdlib_libs "${LIBCXXABI}")
         endif()
@@ -100,17 +104,52 @@ if(USE_LIBCXX AND LIBCXX_LIB_DIR)
     endif()
 endif()
 
+# Linux: libc++ 由 -stdlib=libc++ 链接标志自动处理，无需显式链接
+# 仅在 Windows/MSYS2 等需要手动指定库路径的环境下才需要 find_library
+
 # 添加LLVM支持
 if(DEFINED ENV{LLVM_DIR} AND NOT "$ENV{LLVM_DIR}" STREQUAL "")
     set(LLVM_DIR "$ENV{LLVM_DIR}" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
 elseif(MSYS_CLANG64_ROOT AND EXISTS "${MSYS_CLANG64_ROOT}/lib/cmake/llvm")
     set(LLVM_DIR "${MSYS_CLANG64_ROOT}/lib/cmake/llvm" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
-else()
+elseif(NOT WIN32 AND EXISTS "/usr/lib64/cmake/llvm")
+    # Fedora / RHEL: llvm-devel 安装位置
+    set(LLVM_DIR "/usr/lib64/cmake/llvm" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
+elseif(NOT WIN32 AND EXISTS "/usr/lib/cmake/llvm")
+    # Debian / Ubuntu
+    set(LLVM_DIR "/usr/lib/cmake/llvm" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
+elseif(WIN32)
     set(LLVM_DIR "C:/LLVM/lib/cmake/llvm" CACHE PATH "Path to LLVMConfig.cmake" FORCE)
 endif()
 find_package(LLVM REQUIRED CONFIG)
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
+separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+
+# 检查 LLVM 与项目的标准库 ABI 兼容性
+# Fedora/RHEL/Debian 等发行版的系统 LLVM 包使用 libstdc++ 构建，
+# 若项目使用 libc++ 编译会导致链接时符号不兼容。
+if(_extra_stdlib_flags AND NOT WIN32 AND NOT APPLE)
+    find_program(_llvm_config llvm-config HINTS ${LLVM_TOOLS_BINARY_DIR})
+    if(_llvm_config)
+        execute_process(
+            COMMAND ${_llvm_config} --cxxflags
+            OUTPUT_VARIABLE _llvm_cxxflags
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(NOT _llvm_cxxflags MATCHES "-stdlib=libc\\+\\+")
+            message(STATUS "系统 LLVM 使用 libstdc++ 构建，自动切换到 libstdc++ 以保持 ABI 兼容")
+            message(STATUS "  （若需 libc++，请从源码构建 LLVM 并设置 -DLLVM_ENABLE_LIBCXX=ON）")
+            set(_extra_stdlib_flags "")
+            set(_extra_stdlib_libs "")
+        else()
+            message(STATUS "LLVM 使用 libc++ 构建，保持 -stdlib=libc++")
+        endif()
+    else()
+        message(WARNING "未找到 llvm-config，无法检测 LLVM 标准库；保持当前 stdlib 设置")
+    endif()
+endif()
 
 if(WIN32)
     set(DIAGUIDS_LIB "")
@@ -173,7 +212,9 @@ target_include_directories(Kaleidoscope
         ${LLVM_INCLUDE_DIRS}
         ${PROJECT_SOURCE_DIR}/include)
 
-if(USE_LIBCXX AND LIBCXX_INCLUDE_DIR AND EXISTS "${LIBCXX_INCLUDE_DIR}")
+target_compile_definitions(Kaleidoscope PRIVATE ${LLVM_DEFINITIONS_LIST})
+
+if(_extra_stdlib_flags AND LIBCXX_INCLUDE_DIR AND EXISTS "${LIBCXX_INCLUDE_DIR}")
     target_include_directories(Kaleidoscope SYSTEM PRIVATE ${LIBCXX_INCLUDE_DIR})
 endif()
 

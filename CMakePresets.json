@@ -1,0 +1,79 @@
+﻿{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "linux-clang-release",
+      "displayName": "Linux Clang Release",
+      "description": "WSL2 / Linux: clang++ + Ninja, Release 构建（stdlib 自动匹配系统 LLVM）",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_C_COMPILER": "clang",
+        "USE_CLANG": "ON",
+        "USE_LIBCXX": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "hostOS": [ "Linux" ],
+          "intelliSenseMode": "linux-clang-x64"
+        },
+        "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
+          "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}",
+          "copyAdditionalIncludeDirectoriesList": [
+            "/usr/include/llvm",
+            "/usr/include/llvm-c",
+            "/usr/lib64/clang"
+          ]
+        }
+      }
+    },
+    {
+      "name": "linux-clang-debug",
+      "displayName": "Linux Clang Debug",
+      "description": "WSL2 / Linux: clang++ + Ninja, Debug 构建（stdlib 自动匹配系统 LLVM）",
+      "inherits": "linux-clang-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-msys2-clang",
+      "displayName": "Windows MSYS2 Clang64 Release",
+      "description": "Windows: MSYS2 clang64 + Ninja, Release 构建",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "USE_CLANG": "ON",
+        "USE_LIBCXX": "ON",
+        "MSYS_CLANG64_ROOT": "C:/msys64/clang64",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "hostOS": [ "Windows" ],
+          "intelliSenseMode": "windows-clang-x64"
+        }
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-clang-release",
+      "configurePreset": "linux-clang-release"
+    },
+    {
+      "name": "linux-clang-debug",
+      "configurePreset": "linux-clang-debug"
+    },
+    {
+      "name": "windows-msys2-clang",
+      "configurePreset": "windows-msys2-clang"
+    }
+  ]
+}
