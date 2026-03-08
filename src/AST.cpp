@@ -20,7 +20,7 @@ extern std::unique_ptr<llvm::IRBuilder<> > builder;
 extern std::map<std::string, llvm::AllocaInst*> named_values;
 extern std::unique_ptr<llvm::FunctionPassManager> the_fpm;
 extern std::unique_ptr<llvm::FunctionAnalysisManager> the_fam;
-extern std::map<std::string, std::unique_ptr<PrototypeAst> > function_protos;
+extern std::map<std::string, std::unique_ptr<PrototypeAST> > function_protos;
 
 llvm::Function *get_function(const std::string& name);
 llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction,
@@ -28,7 +28,7 @@ llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction,
 llvm::DISubroutineType *CreateFunctionType(unsigned NumArgs);
 
 extern Token cur_tok;
-extern std::map<Token, int> binop_precedence;
+extern std::map<Token, int> BinopPrecedence;
 
 llvm::Value* LogErrorV(const char* Str) {
   LogError(Str);
@@ -161,7 +161,7 @@ llvm::Value* CallExprAST::codegen() {
 /// It also sets names for all arguments in the function.
 /// @return  A pointer to the LLVM Function representing the prototype, or nullptr on error.
 /// PrototypeAST::codegen - Code generation for function prototypes.
-llvm::Function* PrototypeAst::codegen() const {
+llvm::Function* PrototypeAST::codegen() const {
   // Make the function type:  double(double,double) etc.
   const std::vector<llvm::Type*> doubles(args_.size(),
                                  llvm::Type::getDoubleTy(*the_context));
@@ -198,7 +198,7 @@ llvm::Function* FunctionAST::codegen() {
 
   // If this is an operator, install it.
   if (p.is_binary_op())
-    binop_precedence[static_cast<Token>(p.get_operator_name())] = static_cast<int>(p.get_binary_precedence());
+    BinopPrecedence[static_cast<Token>(p.get_operator_name())] = static_cast<int>(p.get_binary_precedence());
 
   // Create a new basic block to start insertion into.
   llvm::BasicBlock *bb = llvm::BasicBlock::Create(*the_context, "entry", the_function);
@@ -266,7 +266,7 @@ llvm::Function* FunctionAST::codegen() {
   the_function->eraseFromParent();
 
   if (p.is_binary_op())
-    binop_precedence.erase(static_cast<Token>(p.get_operator_name()));
+    BinopPrecedence.erase(static_cast<Token>(p.get_operator_name()));
 
   // Pop off the lexical block for the function since we added it
   // unconditionally.

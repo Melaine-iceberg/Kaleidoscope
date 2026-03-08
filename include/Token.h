@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-/// The lexer returns tokens [0-255] if it is an unknown character, otherwise one
-/// of these for known things.
-enum class Token : int32_t {
+/// The lexer returns tokens [0-255] if it is an unknown character, otherwise
+/// one of these for known things.
+enum class Token : int16_t {
   k_tok_eof = -1,
 
   // commands
@@ -20,15 +20,15 @@ enum class Token : int32_t {
   // operators
   k_tok_l_paren = '(',
   k_tok_r_paren = ')',
-  //control
+  // control
   k_tok_if = -7,
   k_tok_then = -9,
   k_tok_else = -8,
   k_tok_for = -10,
   k_tok_in = -11,
-
+  // user defined operators
   k_tok_binary = -12,
   k_tok_unary = -13,
-
+  // var/in
   k_tok_var = -14
 };

@@ -68,13 +68,13 @@ std::unique_ptr<llvm::PassInstrumentationCallbacks> the_pic;
 std::unique_ptr<llvm::StandardInstrumentations> the_si;
 
 // 函数原型的映射，用于存储已声明的函数。
-std::map<std::string, std::unique_ptr<PrototypeAst> > function_protos;
+std::map<std::string, std::unique_ptr<PrototypeAST> > function_protos;
 
 // 解析顶层表达式，返回一个 FunctionAST。
 std::unique_ptr<FunctionAST> parse_top_level_expr();
 
 // 函数原型的 AST 类的前向声明。
-class PrototypeAst;
+class PrototypeAST;
 
 // 全局错误处理器，用于处理 LLVM 中的错误。
 llvm::ExitOnError exit_on_err;

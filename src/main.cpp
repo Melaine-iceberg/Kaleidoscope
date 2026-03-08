@@ -118,7 +118,7 @@ int main() {
 
   DBuilder->finalize();
 
-  // Print out all of the generated code.
+  // Print out all the generated code.
   the_module->print(llvm::errs(), nullptr);
 
   // Initialize only native target
@@ -134,7 +134,7 @@ int main() {
   auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
 
   // Print an error and exit if we couldn't find the requested target.
-  // This generally occurs if we've forgotten to initialise the
+  // This generally occurs if we've forgotten to initialize the
   // TargetRegistry or we have a bogus target triple.
   if (!Target) {
     llvm::errs() << Error;

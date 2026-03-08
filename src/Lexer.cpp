@@ -88,19 +88,22 @@ static bool SkipComment(int& last_char) noexcept {
   return last_char != EOF;
 }
 
+/// get_tok - Return the next token from standard input.
+/// @return The next token from standard input, or Token::k_tok_eof on end of file, or Token::k_tok_error on invalid input.
 Token get_tok() {
   static int last_char = ' ';
 
   // Skip any whitespace.
-  while (isspace(last_char)) {
+  while (std::isspace(last_char)) {
     last_char = getchar();
   }
 
-  if (isalpha(last_char)) {
+  if (std::isalpha(last_char)) {
     // identifier: [a-zA-Z][a-zA-Z0-9]*
     identifier_str.assign(1, static_cast<char>(last_char));
-    while (isalnum((last_char = getchar())))
+    while (std::isalnum((last_char = std::getchar()))) {
       identifier_str += static_cast<char>(last_char);
+    }
 
     if (identifier_str == "def") {
       return Token::k_tok_def;
@@ -134,15 +137,15 @@ Token get_tok() {
     }
     return Token::k_tok_identifier;
   }
-  if (isdigit(last_char) || last_char == '.') {
+  if (std::isdigit(last_char) || last_char == '.') {
     // Number: [0-9.]+
     std::string NumStr;
     do {
       NumStr += static_cast<char>(last_char);
-      last_char = getchar();
-    } while (isdigit(last_char) || last_char == '.');
+      last_char = std::getchar();
+    } while (std::isdigit(last_char) || last_char == '.');
 
-    num_val = strtod(NumStr.c_str(), nullptr);
+    num_val = std::strtod(NumStr.c_str(), nullptr);
     return Token::k_tok_number;
   }
 
