@@ -4,7 +4,7 @@
 #include <map>
 #include <print>
 
-#include "Debug.h" 
+#include "Debug.h"
 #include "Lexer.h"
 
 extern Token cur_tok;
@@ -13,6 +13,8 @@ extern Token cur_tok;
 /// defined.
 std::map<Token, int> BinopPrecedence{};
 std::unique_ptr<ExprAST> ParseIfExpr();
+std::unique_ptr<ExprAST> ParseForExpr();
+std::unique_ptr<ExprAST> ParseVarExpr();
 
 static std::unique_ptr<ExprAST> ParseUnary();
 
@@ -62,7 +64,7 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
   }
 
   // Call.
-  get_next_token();                           // eat (
+  get_next_token(); // eat (
   // Parse the argument list.
   std::vector<std::unique_ptr<ExprAST>> args; // Argument expressions.
 
@@ -106,14 +108,22 @@ std::unique_ptr<ExprAST> ParsePrimary() {
     return ParseParenExpr();
   case Token::k_tok_if:
     return ParseIfExpr();
+  case Token::k_tok_for:
+    return ParseForExpr();
+  case Token::k_tok_var:
+    return ParseVarExpr();
   default:
     return LogError("unknown token when expecting an expression");
   }
 }
 
-/// ParseUnary - This function parses unary operators, which can be either a single operator followed by a primary expression, or just a primary expression if there is no unary operator.
-/// @param ExprPrec The precedence of the unary operator, if present. This is used to determine how to parse the expression correctly.
-/// @param LHS The left-hand side expression, if the unary operator is present. This is used to construct the AST for the unary expression.
+/// ParseUnary - This function parses unary operators, which can be either a
+/// single operator followed by a primary expression, or just a primary
+/// expression if there is no unary operator.
+/// @param ExprPrec The precedence of the unary operator, if present. This is
+/// used to determine how to parse the expression correctly.
+/// @param LHS The left-hand side expression, if the unary operator is present.
+/// This is used to construct the AST for the unary expression.
 /// @return A unique pointer to the parsed expression AST, or nullptr on error.
 std::unique_ptr<ExprAST> ParseBinOpRHS(const int ExprPrec,
                                        std::unique_ptr<ExprAST> LHS) {
@@ -168,6 +178,16 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
   case Token::k_tok_identifier:
     fn_name = identifier_str;
     Kind = 0;
+    get_next_token();
+    break;
+  case Token::k_tok_unary:
+    get_next_token();
+    if (!isascii(static_cast<int>(cur_tok))) {
+      return LogErrorP("Expected unary operator");
+    }
+    fn_name = "unary";
+    fn_name += static_cast<char>(cur_tok);
+    Kind = 1;
     get_next_token();
     break;
   case Token::k_tok_binary:
@@ -278,7 +298,8 @@ int GetTokPrecedence() {
 }
 
 // Explicit template instantiation for ExprAST
-template std::unique_ptr<FunctionAST> WrapAsTopLevel<ExprAST>(std::unique_ptr<ExprAST> expr);
+template std::unique_ptr<FunctionAST>
+WrapAsTopLevel<ExprAST>(std::unique_ptr<ExprAST> expr);
 
 // Initialize binary operator precedence
 void InitializeBinopPrecedence() {
@@ -288,7 +309,7 @@ void InitializeBinopPrecedence() {
   BinopPrecedence[static_cast<Token>('<')] = 10;
   BinopPrecedence[static_cast<Token>('+')] = 20;
   BinopPrecedence[static_cast<Token>('-')] = 20;
-  BinopPrecedence[static_cast<Token>('*')] = 40;  // highest.
+  BinopPrecedence[static_cast<Token>('*')] = 40; // highest.
 }
 
 /// unary
@@ -296,7 +317,8 @@ void InitializeBinopPrecedence() {
 ///   ::= '!' unary
 static std::unique_ptr<ExprAST> ParseUnary() {
   // If the current token is not an operator, it must be a primary expr.
-  if (!isascii(static_cast<int>(cur_tok)) || cur_tok == static_cast<Token>('(') ||
+  if (!isascii(static_cast<int>(cur_tok)) ||
+      cur_tok == static_cast<Token>('(') ||
       cur_tok == Token::k_tok_identifier || cur_tok == Token::k_tok_number)
     return ParsePrimary();
 

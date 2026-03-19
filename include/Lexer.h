@@ -5,9 +5,8 @@
 #include "Token.h"
 
 // Global lexer state
-extern std::string identifier_str;  // Filled in if tok_identifier
-extern double num_val;              // Filled in if tok_number
-extern int line_num;                // Track line numbers for error reporting
+extern std::string identifier_str; // Filled in if tok_identifier
+extern double num_val;             // Filled in if tok_number
 
 /// gettok - Return the next token from standard input.
 Token get_tok();

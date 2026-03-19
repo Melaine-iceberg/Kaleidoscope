@@ -8,9 +8,7 @@
 
 #include "AST.h"
 
-extern std::unique_ptr<llvm::IRBuilder<> > builder;
-
-
+extern std::unique_ptr<llvm::IRBuilder<>> builder;
 
 llvm::DIType *DebugInfo::getDoubleTy() {
   if (DblTy)
@@ -26,11 +24,11 @@ int advance() {
   if (LastChar == '\n' || LastChar == '\r') {
     LexLoc.Line++;
     LexLoc.Col = 0;
-  } else
+  } else {
     LexLoc.Col++;
+  }
   return LastChar;
 }
-
 
 void DebugInfo::emitLocation(ExprAST *AST) {
   if (!AST)
@@ -40,8 +38,8 @@ void DebugInfo::emitLocation(ExprAST *AST) {
     Scope = TheCU;
   else
     Scope = LexicalBlocks.back();
-  builder->SetCurrentDebugLocation(
-      llvm::DILocation::get(Scope->getContext(), AST->getLine(), AST->getCol(), Scope));
+  builder->SetCurrentDebugLocation(llvm::DILocation::get(
+      Scope->getContext(), AST->getLine(), AST->getCol(), Scope));
 }
 
 llvm::DISubroutineType *CreateFunctionType(unsigned NumArgs) {

@@ -110,9 +110,6 @@ int main() {
       llvm::dwarf::DW_LANG_C, DBuilder->createFile("fib.ks", "."),
       "Kaleidoscope Compiler", false, "", 0);
 
-  std::print(stderr, "ready> ");
-  // Prime the first token.
-
   // Now run the main "interpreter loop".
   MainLoop();
 
@@ -120,11 +117,6 @@ int main() {
 
   // Print out all the generated code.
   the_module->print(llvm::errs(), nullptr);
-
-  // Initialize only native target
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
-  llvm::InitializeNativeTargetAsmParser();
 
   const auto TargetTriple = llvm::sys::getDefaultTargetTriple();
   const llvm::Triple TheTriple(TargetTriple);

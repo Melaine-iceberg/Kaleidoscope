@@ -2,52 +2,53 @@
 
 #include <llvm/Analysis/LoopAnalysisManager.h>
 
+#include <cassert>
 #include <map>
 #include <memory>
-#include <cassert>
 
 #include "Debug.h"
 #include "Lexer.h"
+#include "Parser.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
-#include "Parser.h"
 
 extern std::unique_ptr<llvm::LLVMContext> the_context;
 extern std::unique_ptr<llvm::Module> the_module;
-extern std::unique_ptr<llvm::IRBuilder<> > builder;
-extern std::map<std::string, llvm::AllocaInst*> named_values;
+extern std::unique_ptr<llvm::IRBuilder<>> builder;
+extern std::map<std::string, llvm::AllocaInst *> named_values;
 extern std::unique_ptr<llvm::FunctionPassManager> the_fpm;
 extern std::unique_ptr<llvm::FunctionAnalysisManager> the_fam;
-extern std::map<std::string, std::unique_ptr<PrototypeAST> > function_protos;
+extern std::map<std::string, std::unique_ptr<PrototypeAST>> function_protos;
 
-llvm::Function *get_function(const std::string& name);
+llvm::Function *get_function(const std::string &name);
 llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction,
-                                                llvm::StringRef VarName);
+                                         llvm::StringRef VarName);
 llvm::DISubroutineType *CreateFunctionType(unsigned NumArgs);
 
 extern Token cur_tok;
 extern std::map<Token, int> BinopPrecedence;
 
-llvm::Value* LogErrorV(const char* Str) {
+llvm::Value *LogErrorV(const char *Str) {
   LogError(Str);
   return nullptr;
 }
 
 /// LogError - Helper function to log errors and return nullptr.
-llvm::Value* NumberExprAST::codegen() {
+llvm::Value *NumberExprAST::codegen() {
   KSDbgInfo.emitLocation(this);
   return llvm::ConstantFP::get(*the_context, llvm::APFloat(val_));
 }
 
 ///  VariableExprAST::codegen - Code generation for variable expressions.
-/// @return A pointer to the LLVM Value representing the variable, or nullptr on error.
-llvm::Value* VariableExprAST::codegen() {
+/// @return A pointer to the LLVM Value representing the variable, or nullptr on
+/// error.
+llvm::Value *VariableExprAST::codegen() {
   // Look this variable up in the function.
-  llvm::AllocaInst* A = named_values[name_]; // 查找变量名对应的 LLVM Value
+  llvm::AllocaInst *A = named_values[name_]; // 查找变量名对应的 LLVM Value
   if (!A) {
-    LogErrorV("Unknown variable name");
+    return LogErrorV("Unknown variable name");
   }
   KSDbgInfo.emitLocation(this);
   // Load the value.
@@ -55,8 +56,9 @@ llvm::Value* VariableExprAST::codegen() {
 }
 
 /// BinaryExprAST::codegen - Code generation for binary expressions.
-/// @return A pointer to the LLVM Value representing the result of the binary operation, or nullptr on error.
-llvm::Value* BinaryExprAST::codegen() {
+/// @return A pointer to the LLVM Value representing the result of the binary
+/// operation, or nullptr on error.
+llvm::Value *BinaryExprAST::codegen() {
   KSDbgInfo.emitLocation(this);
 
   // Special case '=' because we don't want to emit the LHS as an expression.
@@ -91,24 +93,26 @@ llvm::Value* BinaryExprAST::codegen() {
     return nullptr;
 
   switch (op_) {
-    case static_cast<Token>('+'):
-      return builder->CreateFAdd(L, R, "addtmp");
-    case static_cast<Token>('-'):
-      return builder->CreateFSub(L, R, "subtmp");
-    case static_cast<Token>('*'):
-      return builder->CreateFMul(L, R, "multmp");
-    case static_cast<Token>('<'):
-      L = builder->CreateFCmpULT(L, R, "cmptmp");
-      // Convert bool 0/1 to double 0.0 or 1.0
-      return builder->CreateUIToFP(L, llvm::Type::getDoubleTy(*the_context), "booltmp");
-    default:
-      break;
+  case static_cast<Token>('+'):
+    return builder->CreateFAdd(L, R, "addtmp");
+  case static_cast<Token>('-'):
+    return builder->CreateFSub(L, R, "subtmp");
+  case static_cast<Token>('*'):
+    return builder->CreateFMul(L, R, "multmp");
+  case static_cast<Token>('<'):
+    L = builder->CreateFCmpULT(L, R, "cmptmp");
+    // Convert bool 0/1 to double 0.0 or 1.0
+    return builder->CreateUIToFP(L, llvm::Type::getDoubleTy(*the_context),
+                                 "booltmp");
+  default:
+    break;
   }
 
   // If it wasn't a builtin binary operator, it must be a user defined one. Emit
   // a call to it.
   const char op_char = static_cast<char>(static_cast<int>(op_));
-  llvm::Function *F = get_function(std::string("binary") + std::string(1, op_char));
+  llvm::Function *F =
+      get_function(std::string("binary") + std::string(1, op_char));
   assert(F && "binary operator not found!");
 
   llvm::Value *Ops[] = {L, R};
@@ -117,18 +121,19 @@ llvm::Value* BinaryExprAST::codegen() {
 
 /// CallExprAST::codegen - Code generation for function calls.
 /// This function generates LLVM IR for a function call expression.
-/// It looks up the function by name, checks the number of arguments, and generates
-/// the call instruction with the provided arguments.
-/// @return A pointer to the LLVM Value representing the function call, or nullptr on error.
-/// If the function is not found or the number of arguments does not match, it logs an error.
-/// If the function call is successful, it returns the generated call instruction.
-/// The function expects the callee name and a vector of argument expressions.
-/// It retrieves the function from the module, checks the argument count, and generates the call.
-llvm::Value* CallExprAST::codegen() {
+/// It looks up the function by name, checks the number of arguments, and
+/// generates the call instruction with the provided arguments.
+/// @return A pointer to the LLVM Value representing the function call, or
+/// nullptr on error. If the function is not found or the number of arguments
+/// does not match, it logs an error. If the function call is successful, it
+/// returns the generated call instruction. The function expects the callee name
+/// and a vector of argument expressions. It retrieves the function from the
+/// module, checks the argument count, and generates the call.
+llvm::Value *CallExprAST::codegen() {
   KSDbgInfo.emitLocation(this);
 
   // Look up the name in the global module table.
-  llvm::Function* callee_f = get_function(callee_);
+  llvm::Function *callee_f = get_function(callee_);
   if (!callee_f) {
     return LogErrorV("Unknown function referenced");
   }
@@ -139,10 +144,11 @@ llvm::Value* CallExprAST::codegen() {
     return LogErrorV("Incorrect # arguments passed");
   }
   /// Generate code for each argument.
-  /// We create a vector of llvm::Value* to hold the generated code for each argument.
-  /// This is necessary because CreateCall expects a vector of Value pointers.
-  std::vector<llvm::Value*> args_v;
-  for (const auto& arg : args_) {
+  /// We create a vector of llvm::Value* to hold the generated code for each
+  /// argument. This is necessary because CreateCall expects a vector of Value
+  /// pointers.
+  std::vector<llvm::Value *> args_v;
+  for (const auto &arg : args_) {
     args_v.push_back(arg->codegen());
     if (!args_v.back()) {
       return nullptr;
@@ -156,26 +162,25 @@ llvm::Value* CallExprAST::codegen() {
 
 /// PrototypeAST::codegen - Code generation for function prototypes.
 /// This function generates LLVM IR for a function prototype.
-/// It creates a function type based on the specified return type and argument types,
-/// and then creates a function with the specified name and type in the module.
-/// It also sets names for all arguments in the function.
-/// @return  A pointer to the LLVM Function representing the prototype, or nullptr on error.
-/// PrototypeAST::codegen - Code generation for function prototypes.
-llvm::Function* PrototypeAST::codegen() const {
+/// It creates a function type based on the specified return type and argument
+/// types, and then creates a function with the specified name and type in the
+/// module. It also sets names for all arguments in the function.
+/// @return  A pointer to the LLVM Function representing the prototype, or
+/// nullptr on error. PrototypeAST::codegen - Code generation for function
+/// prototypes.
+llvm::Function *PrototypeAST::codegen() const {
   // Make the function type:  double(double,double) etc.
-  const std::vector<llvm::Type*> doubles(args_.size(),
-                                 llvm::Type::getDoubleTy(*the_context));
+  const std::vector<llvm::Type *> doubles(
+      args_.size(), llvm::Type::getDoubleTy(*the_context));
   // Create a function type with the specified return type and argument types.
-  llvm::FunctionType* ft =
-      llvm::FunctionType::get(llvm::Type::getDoubleTy(*the_context), doubles,
-                              false);
+  llvm::FunctionType *ft = llvm::FunctionType::get(
+      llvm::Type::getDoubleTy(*the_context), doubles, false);
   // Create a function with the specified name and type.
-  llvm::Function* f =
-      llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name_,
-                             the_module.get());
+  llvm::Function *f = llvm::Function::Create(
+      ft, llvm::Function::ExternalLinkage, name_, the_module.get());
   // Set names for all arguments.
   unsigned idx = 0;
-  for (auto& arg : f->args()) {
+  for (auto &arg : f->args()) {
     arg.setName(args_[idx++]);
   }
 
@@ -184,9 +189,10 @@ llvm::Function* PrototypeAST::codegen() const {
 
 /// FunctionAST::codegen - Code generation for function definitions.
 /// This function generates LLVM IR for a function definition.
-/// @return  A pointer to the LLVM Function representing the function definition, or nullptr on error.
-/// FunctionAST::codegen - Code generation for function definitions.
-llvm::Function* FunctionAST::codegen() {
+/// @return  A pointer to the LLVM Function representing the function
+/// definition, or nullptr on error. FunctionAST::codegen - Code generation for
+/// function definitions.
+llvm::Function *FunctionAST::codegen() {
   // Transfer ownership of the prototype to the FunctionProtos map, but keep a
   // reference to it for use below.
   auto &p = *proto_;
@@ -198,10 +204,12 @@ llvm::Function* FunctionAST::codegen() {
 
   // If this is an operator, install it.
   if (p.is_binary_op())
-    BinopPrecedence[static_cast<Token>(p.get_operator_name())] = static_cast<int>(p.get_binary_precedence());
+    BinopPrecedence[static_cast<Token>(p.get_operator_name())] =
+        static_cast<int>(p.get_binary_precedence());
 
   // Create a new basic block to start insertion into.
-  llvm::BasicBlock *bb = llvm::BasicBlock::Create(*the_context, "entry", the_function);
+  llvm::BasicBlock *bb =
+      llvm::BasicBlock::Create(*the_context, "entry", the_function);
   builder->SetInsertPoint(bb);
 
   // Create a subprogram DIE for this function.
@@ -229,16 +237,18 @@ llvm::Function* FunctionAST::codegen() {
   unsigned ArgIdx = 0;
   for (auto &Arg : the_function->args()) {
     // Create an alloca for this variable.
-    llvm::AllocaInst *Alloca = CreateEntryBlockAlloca(the_function, Arg.getName());
+    llvm::AllocaInst *Alloca =
+        CreateEntryBlockAlloca(the_function, Arg.getName());
 
     // Create a debug descriptor for the variable.
     llvm::DILocalVariable *D = DBuilder->createParameterVariable(
         SP, Arg.getName(), ++ArgIdx, Unit, LineNo, KSDbgInfo.getDoubleTy(),
         true);
 
-    DBuilder->insertDeclare(Alloca, D, DBuilder->createExpression(),
-                            llvm::DILocation::get(SP->getContext(), LineNo, 0, SP),
-                            builder->GetInsertBlock());
+    DBuilder->insertDeclare(
+        Alloca, D, DBuilder->createExpression(),
+        llvm::DILocation::get(SP->getContext(), LineNo, 0, SP),
+        builder->GetInsertBlock());
 
     // Store the initial value into the alloca.
     builder->CreateStore(&Arg, Alloca);
@@ -279,11 +289,11 @@ llvm::Function* FunctionAST::codegen() {
 /// This function generates LLVM IR for an if expression.
 /// It evaluates the condition, and based on the result, it generates code for
 /// the then and else branches. It uses basic blocks to handle the control flow.
-/// @return A pointer to the LLVM Value representing the result of the if expression,
-/// or nullptr on error.
-/// If the condition is true, it evaluates the then branch; otherwise, it evaluates the else
-/// branch. It uses PHI nodes to merge the results from both branches into a single value.
-llvm::Value* IfExprAST::codegen() {
+/// @return A pointer to the LLVM Value representing the result of the if
+/// expression, or nullptr on error. If the condition is true, it evaluates the
+/// then branch; otherwise, it evaluates the else branch. It uses PHI nodes to
+/// merge the results from both branches into a single value.
+llvm::Value *IfExprAST::codegen() {
   KSDbgInfo.emitLocation(this);
 
   llvm::Value *CondV = Cond->codegen();
@@ -335,7 +345,7 @@ llvm::Value* IfExprAST::codegen() {
   TheFunction->insert(TheFunction->end(), MergeBB);
   builder->SetInsertPoint(MergeBB);
   llvm::PHINode *PN =
-    builder->CreatePHI(llvm::Type::getDoubleTy(*the_context), 2, "iftmp");
+      builder->CreatePHI(llvm::Type::getDoubleTy(*the_context), 2, "iftmp");
 
   PN->addIncoming(ThenV, ThenBB);
   PN->addIncoming(ElseV, ElseBB);
@@ -345,10 +355,11 @@ llvm::Value* IfExprAST::codegen() {
 /// ForExprAST::codegen - Code generation for for/in expressions.
 /// This function generates LLVM IR for a for loop expression.
 /// It sets up the loop variable, start, end, and step expressions,
-/// and generates the loop body. It uses basic blocks to handle the loop control flow.
-/// @return A pointer to the LLVM Value representing the result of the for expression,
-/// or nullptr on error.
-llvm::Value* ForExprAST::codegen() {
+/// and generates the loop body. It uses basic blocks to handle the loop control
+/// flow.
+/// @return A pointer to the LLVM Value representing the result of the for
+/// expression, or nullptr on error.
+llvm::Value *ForExprAST::codegen() {
 
   llvm::Function *TheFunction = builder->GetInsertBlock()->getParent();
 
@@ -367,7 +378,8 @@ llvm::Value* ForExprAST::codegen() {
 
   // Make the new basic block for the loop header, inserting after current
   // block.
-llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*the_context, "loop", TheFunction);
+  llvm::BasicBlock *LoopBB =
+      llvm::BasicBlock::Create(*the_context, "loop", TheFunction);
 
   // Insert an explicit fall through from the current block to the LoopBB.
   builder->CreateBr(LoopBB);
@@ -377,7 +389,7 @@ llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*the_context, "loop", TheFun
 
   // Within the loop, the variable is defined equal to the PHI node.  If it
   // shadows an existing variable, we have to restore it, so save it now.
-llvm::AllocaInst *OldVal = named_values[VarName];
+  llvm::AllocaInst *OldVal = named_values[VarName];
   named_values[VarName] = Alloca;
 
   // Emit the body of the loop.  This, like any other expr, can change the
@@ -387,7 +399,7 @@ llvm::AllocaInst *OldVal = named_values[VarName];
     return nullptr;
 
   // Emit the step value.
-llvm::Value *StepVal = nullptr;
+  llvm::Value *StepVal = nullptr;
   if (Step) {
     StepVal = Step->codegen();
     if (!StepVal)
@@ -398,24 +410,25 @@ llvm::Value *StepVal = nullptr;
   }
 
   // Compute the end condition.
-llvm::Value *EndCond = End->codegen();
+  llvm::Value *EndCond = End->codegen();
   if (!EndCond)
     return nullptr;
 
   // Reload, increment, and restore the alloca.  This handles the case where
   // the body of the loop mutates the variable.
-llvm::Value *CurVar =
+  llvm::Value *CurVar =
       builder->CreateLoad(Alloca->getAllocatedType(), Alloca, VarName.c_str());
-llvm::Value *NextVar = builder->CreateFAdd(CurVar, StepVal, "nextvar");
+  llvm::Value *NextVar = builder->CreateFAdd(CurVar, StepVal, "nextvar");
   builder->CreateStore(NextVar, Alloca);
 
   // Convert condition to a bool by comparing non-equal to 0.0.
   EndCond = builder->CreateFCmpONE(
-      EndCond, llvm::ConstantFP::get(*the_context, llvm::APFloat(0.0)), "loopcond");
+      EndCond, llvm::ConstantFP::get(*the_context, llvm::APFloat(0.0)),
+      "loopcond");
 
   // Create the "after loop" block and insert it.
-llvm::BasicBlock *AfterBB =
-    llvm::BasicBlock::Create(*the_context, "afterloop", TheFunction);
+  llvm::BasicBlock *AfterBB =
+      llvm::BasicBlock::Create(*the_context, "afterloop", TheFunction);
 
   // Insert the conditional branch into the end of LoopEndBB.
   builder->CreateCondBr(EndCond, LoopBB, AfterBB);
@@ -430,10 +443,11 @@ llvm::BasicBlock *AfterBB =
     named_values.erase(VarName);
 
   // for expr always returns 0.0.
-  return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*the_context));;
+  return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*the_context));
+  ;
 }
 
-llvm::Value* UnaryExprAST::codegen() {
+llvm::Value *UnaryExprAST::codegen() {
   llvm::Value *OperandV = Operand->codegen();
   if (!OperandV)
     return nullptr;
@@ -443,16 +457,15 @@ llvm::Value* UnaryExprAST::codegen() {
     return LogErrorV("Unknown unary operator");
   KSDbgInfo.emitLocation(this);
   return builder->CreateCall(f, {OperandV}, "unop");
-
 }
 
-llvm::Value* VarExprAST::codegen() {
+llvm::Value *VarExprAST::codegen() {
   std::vector<llvm::AllocaInst *> OldBindings;
 
   llvm::Function *TheFunction = builder->GetInsertBlock()->getParent();
 
   // Register all variables and emit their initializer.
-  for (auto & [fst, snd] : VarNames) {
+  for (auto &[fst, snd] : VarNames) {
     const std::string &VarName = fst;
     ExprAST *Init = snd.get();
     // Emit the initializer before adding the variable to scope, this prevents
@@ -502,7 +515,7 @@ llvm::Value* VarExprAST::codegen() {
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
 llvm::AllocaInst *CreateEntryBlockAlloca(llvm::Function *TheFunction,
-                                                llvm::StringRef VarName) {
+                                         llvm::StringRef VarName) {
   llvm::IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
                          TheFunction->getEntryBlock().begin());
   return TmpB.CreateAlloca(llvm::Type::getDoubleTy(*the_context), nullptr,

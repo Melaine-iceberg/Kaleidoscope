@@ -2,17 +2,15 @@
 // Created by Mt342 on 2025/8/22.
 //
 
-#include <algorithm>
-
+#include "Debug.h" // 包含 CurLoc 的定义
 #include "Lexer.h"
 #include "Parser.h"
-#include "Debug.h"  // 包含 CurLoc 的定义
-class IfExprAST;
 extern Token cur_tok;
 
-/// ParsePrimary - This function parses primary expressions like numbers, identifiers, or parenthesized expressions.
+/// ParsePrimary - This function parses primary expressions like numbers,
+/// identifiers, or parenthesized expressions.
 std::unique_ptr<ExprAST> ParseIfExpr() {
-  get_next_token();  // eat the if.
+  get_next_token(); // eat the if.
 
   // condition.
   auto Cond = ParseExpression();
@@ -23,7 +21,7 @@ std::unique_ptr<ExprAST> ParseIfExpr() {
   if (cur_tok != Token::k_tok_then) {
     return LogError("expected then");
   }
-  get_next_token();  // eat the then
+  get_next_token(); // eat the then
 
   auto Then = ParseExpression();
   if (!Then) {
@@ -47,21 +45,22 @@ std::unique_ptr<ExprAST> ParseIfExpr() {
 }
 
 /// ParseForExpr - This function parses for/in expressions.
-/// @return A unique pointer to the ForExprAST representing the parsed for expression, or nullptr on error.
+/// @return A unique pointer to the ForExprAST representing the parsed for
+/// expression, or nullptr on error.
 std::unique_ptr<ExprAST> ParseForExpr() {
-  get_next_token();  // eat the for.
+  get_next_token(); // eat the for.
 
   if (cur_tok != Token::k_tok_identifier) {
     return LogError("expected identifier after for");
   }
 
   std::string IdName = identifier_str;
-  get_next_token();  // eat identifier.
+  get_next_token(); // eat identifier.
 
   if (cur_tok != static_cast<Token>('=')) {
     return LogError("expected '=' after for");
   }
-  get_next_token();  // eat '='.
+  get_next_token(); // eat '='.
 
   // The start expression.
   auto Start = ParseExpression();
@@ -91,7 +90,7 @@ std::unique_ptr<ExprAST> ParseForExpr() {
   if (cur_tok != Token::k_tok_in) {
     return LogError("expected 'in' after for");
   }
-  get_next_token();  // eat 'in'.
+  get_next_token(); // eat 'in'.
 
   auto Body = ParseExpression();
   if (!Body) {
@@ -104,7 +103,8 @@ std::unique_ptr<ExprAST> ParseForExpr() {
 }
 
 /// ParseVarExpr - This function parses var/in expressions.
-/// var identifier ('=' expression)? (',' identifier ('=' expression)?)* 'in' expression
+/// var identifier ('=' expression)? (',' identifier ('=' expression)?)* 'in'
+/// expression
 std::unique_ptr<ExprAST> ParseVarExpr() {
   get_next_token(); // eat 'var'
 
@@ -124,7 +124,8 @@ std::unique_ptr<ExprAST> ParseVarExpr() {
       get_next_token(); // eat '='
 
       Init = ParseExpression();
-      if (!Init) return nullptr;
+      if (!Init)
+        return nullptr;
     }
 
     VarNames.emplace_back(Name, std::move(Init));
@@ -147,5 +148,6 @@ std::unique_ptr<ExprAST> ParseVarExpr() {
   if (!Body)
     return nullptr;
 
-  return std::make_unique<VarExprAST>(CurLoc, std::move(VarNames), std::move(Body));
+  return std::make_unique<VarExprAST>(CurLoc, std::move(VarNames),
+                                      std::move(Body));
 }
