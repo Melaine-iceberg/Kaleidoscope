@@ -21,7 +21,7 @@
                     "hostOS": [
                         "Linux"
                     ],
-                    "intelliSenseMode": "linux-clang-x64"
+                    "intelliSenseMode": "linux-gcc-x64"
                 },
                 "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
                     "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}",

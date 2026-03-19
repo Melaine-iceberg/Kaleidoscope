@@ -1,8 +1,8 @@
 #include "Parser.h"
 
 #include <cctype>
+#include <cstdio>
 #include <map>
-#include <print>
 
 #include "Debug.h"
 #include "Lexer.h"
@@ -211,14 +211,17 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
     break;
   }
 
-  if (cur_tok == Token::k_tok_number) {
+  if (cur_tok != static_cast<Token>('(')) {
     return LogErrorP("Expected '(' in prototype");
   }
 
   std::vector<std::string> ArgNames;
-  while (get_next_token() == Token::k_tok_identifier)
+  get_next_token(); // eat '('
+  while (cur_tok == Token::k_tok_identifier) {
     ArgNames.push_back(identifier_str);
-  if (cur_tok == Token::k_tok_number) {
+    get_next_token();
+  }
+  if (cur_tok != static_cast<Token>(')')) {
     return LogErrorP("Expected ')' in prototype");
   }
 
@@ -274,7 +277,8 @@ std::unique_ptr<FunctionAST> WrapAsTopLevel(std::unique_ptr<ExprType> expr) {
 
 /// LogError* - These are little helper functions for error handling.
 std::unique_ptr<ExprAST> LogError(std::string_view str) {
-  std::println(stderr, "Error: {}", str);
+  std::fprintf(stderr, "Error: %.*s\n", static_cast<int>(str.size()),
+               str.data());
   return nullptr;
 }
 

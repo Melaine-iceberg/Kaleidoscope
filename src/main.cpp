@@ -14,7 +14,7 @@
 #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
-#include <print>
+#include <cstdio>
 
 #include "AST.h"
 #include "Debug.h"
@@ -41,13 +41,16 @@ std::unique_ptr<FunctionAST> parse_top_level_expr() {
 /// top ::= definition | external | expression | ';'
 static void MainLoop() {
   while (true) {
-    std::print(stderr, "ready> ");
-    switch (get_current_token()) {
+    std::fputs("ready> ", stderr);
+    const Token current_token = get_current_token();
+    if (current_token == static_cast<Token>(';')) {
+      get_next_token();
+      continue;
+    }
+
+    switch (current_token) {
     case Token::k_tok_eof:
       return;
-    case static_cast<Token>(';'): // ignore top-level semicolons.
-      get_next_token();
-      break;
     case Token::k_tok_def:
       HandleDefinition();
       break;
@@ -123,7 +126,7 @@ int main() {
   the_module->setTargetTriple(TheTriple);
 
   std::string Error;
-  auto Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+  auto Target = llvm::TargetRegistry::lookupTarget(TheTriple, Error);
 
   // Print an error and exit if we couldn't find the requested target.
   // This generally occurs if we've forgotten to initialize the

@@ -67,7 +67,7 @@ llvm::Value *BinaryExprAST::codegen() {
     // This assume we're building without RTTI because LLVM builds that way by
     // default.  If you build LLVM with RTTI this can be changed to a
     // dynamic_cast for automatic error checking.
-    auto *LHSE = static_cast<VariableExprAST *>(lhs_.get());
+    auto *LHSE = dynamic_cast<VariableExprAST *>(lhs_.get());
     if (!LHSE) {
       return LogErrorV("destination of '=' must be a variable");
     }
@@ -92,14 +92,14 @@ llvm::Value *BinaryExprAST::codegen() {
   if (!L || !R)
     return nullptr;
 
-  switch (op_) {
-  case static_cast<Token>('+'):
+  switch (static_cast<int>(op_)) {
+  case '+':
     return builder->CreateFAdd(L, R, "addtmp");
-  case static_cast<Token>('-'):
+  case '-':
     return builder->CreateFSub(L, R, "subtmp");
-  case static_cast<Token>('*'):
+  case '*':
     return builder->CreateFMul(L, R, "multmp");
-  case static_cast<Token>('<'):
+  case '<':
     L = builder->CreateFCmpULT(L, R, "cmptmp");
     // Convert bool 0/1 to double 0.0 or 1.0
     return builder->CreateUIToFP(L, llvm::Type::getDoubleTy(*the_context),
@@ -175,6 +175,17 @@ llvm::Function *PrototypeAST::codegen() const {
   // Create a function type with the specified return type and argument types.
   llvm::FunctionType *ft = llvm::FunctionType::get(
       llvm::Type::getDoubleTy(*the_context), doubles, false);
+  if (llvm::Function *existing_function = the_module->getFunction(name_)) {
+    if (!existing_function->empty()) {
+      LogErrorV("Function cannot be redefined");
+      return nullptr;
+    }
+    if (existing_function->arg_size() != args_.size()) {
+      LogErrorV("Function signature mismatch in redeclaration");
+      return nullptr;
+    }
+    return existing_function;
+  }
   // Create a function with the specified name and type.
   llvm::Function *f = llvm::Function::Create(
       ft, llvm::Function::ExternalLinkage, name_, the_module.get());
@@ -199,6 +210,10 @@ llvm::Function *FunctionAST::codegen() {
   function_protos[proto_->GetName()] = std::move(proto_);
   llvm::Function *the_function = get_function(p.GetName());
   if (!the_function) {
+    return nullptr;
+  }
+  if (!the_function->empty()) {
+    LogErrorV("Function cannot be redefined");
     return nullptr;
   }
 

@@ -47,7 +47,7 @@ if(USE_CLANG AND NOT DEFINED CMAKE_CXX_COMPILER)
     endif()
 endif()
 
-project(Kaleidoscope LANGUAGES CXX)
+project(Kaleidoscope LANGUAGES C CXX)
 
 # 使用 C++23
 set(CMAKE_CXX_STANDARD 23)
@@ -80,12 +80,12 @@ if(WIN32 AND MSYS_CLANG64_ROOT AND EXISTS "${MSYS_CLANG64_ROOT}/bin/llvm-rc.exe"
     set(CMAKE_RC_COMPILER "${MSYS_CLANG64_ROOT}/bin/llvm-rc.exe" CACHE FILEPATH "" FORCE)
 endif()
 
-if(USE_LIBCXX AND NOT LIBCXX_INCLUDE_DIR AND EXISTS "C:/LLVM/lib/clang/21/include")
-    set(LIBCXX_INCLUDE_DIR "C:/LLVM/lib/clang/21/include" CACHE PATH "" FORCE)
+if(USE_LIBCXX AND NOT LIBCXX_INCLUDE_DIR AND EXISTS "C:/LLVM/lib/clang/22/include")
+    set(LIBCXX_INCLUDE_DIR "C:/LLVM/lib/clang/22/include" CACHE PATH "" FORCE)
 endif()
 
-if(USE_LIBCXX AND NOT LIBCXX_LIB_DIR AND EXISTS "C:/LLVM/lib/clang/21/lib/windows")
-    set(LIBCXX_LIB_DIR "C:/LLVM/lib/clang/21/lib/windows" CACHE PATH "" FORCE)
+if(USE_LIBCXX AND NOT LIBCXX_LIB_DIR AND EXISTS "C:/LLVM/lib/clang/22/lib/windows")
+    set(LIBCXX_LIB_DIR "C:/LLVM/lib/clang/22/lib/windows" CACHE PATH "" FORCE)
 endif()
 
 if(USE_LIBCXX AND MSYS_CLANG64_ROOT)
@@ -207,6 +207,8 @@ add_executable(Kaleidoscope
         "src/control flow.cpp"
         src/Debug.cpp)
 
+target_compile_features(Kaleidoscope PRIVATE cxx_std_23)
+
 target_include_directories(Kaleidoscope
         PRIVATE
         ${LLVM_INCLUDE_DIRS}
@@ -223,22 +225,26 @@ if(_extra_stdlib_flags)
     target_link_options(Kaleidoscope PRIVATE ${_extra_stdlib_flags})
 endif()
 
-# 链接LLVM库（尽量收敛组件以提升跨平台可用性）
-llvm_map_components_to_libnames(LLVM_LIBS
-    core
-    support
-    irreader
-    executionengine
-    mcjit
-    native
-    nativecodegen
-    target
-    asmparser
-    mc
-    mcparser
-    bitreader
-    bitwriter
-    analysis
-    passes
-    transformutils)
-target_link_libraries(Kaleidoscope PRIVATE ${LLVM_LIBS} ${_zlib_target} ${_extra_stdlib_libs})
+# 链接 LLVM：优先使用 LLVMConfig 提供的统一目标；若不可用，再退回组件库映射。
+if(TARGET LLVM)
+    target_link_libraries(Kaleidoscope PRIVATE LLVM ${_zlib_target} ${_extra_stdlib_libs})
+else()
+    llvm_map_components_to_libnames(LLVM_LIBS
+        core
+        support
+        irreader
+        executionengine
+        mcjit
+        native
+        nativecodegen
+        target
+        asmparser
+        mc
+        mcparser
+        bitreader
+        bitwriter
+        analysis
+        passes
+        transformutils)
+    target_link_libraries(Kaleidoscope PRIVATE ${LLVM_LIBS} ${_zlib_target} ${_extra_stdlib_libs})
+endif()

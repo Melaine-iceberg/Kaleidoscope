@@ -1,8 +1,8 @@
 #include "Lexer.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
-#include <print>
 
 #include "Debug.h"
 
