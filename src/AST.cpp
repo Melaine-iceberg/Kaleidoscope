@@ -30,6 +30,18 @@ llvm::DISubroutineType *CreateFunctionType(unsigned NumArgs);
 extern Token cur_tok;
 extern std::map<Token, int> BinopPrecedence;
 
+namespace {
+
+llvm::AllocaInst *lookup_named_value(const std::string &name) {
+  const auto it = named_values.find(name);
+  if (it == named_values.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+} // namespace
+
 llvm::Value *LogErrorV(const char *Str) {
   LogError(Str);
   return nullptr;
@@ -46,7 +58,7 @@ llvm::Value *NumberExprAST::codegen() {
 /// error.
 llvm::Value *VariableExprAST::codegen() {
   // Look this variable up in the function.
-  llvm::AllocaInst *A = named_values[name_]; // 查找变量名对应的 LLVM Value
+  llvm::AllocaInst *A = lookup_named_value(name_);
   if (!A) {
     return LogErrorV("Unknown variable name");
   }
@@ -78,7 +90,7 @@ llvm::Value *BinaryExprAST::codegen() {
     }
 
     // Look up the name.
-    llvm::Value *Variable = named_values[LHSE->GetName()];
+    llvm::Value *Variable = lookup_named_value(LHSE->GetName());
     if (!Variable) {
       return LogErrorV("Unknown variable name");
     }
@@ -204,11 +216,11 @@ llvm::Function *PrototypeAST::codegen() const {
 /// definition, or nullptr on error. FunctionAST::codegen - Code generation for
 /// function definitions.
 llvm::Function *FunctionAST::codegen() {
-  // Transfer ownership of the prototype to the FunctionProtos map, but keep a
-  // reference to it for use below.
   auto &p = *proto_;
-  function_protos[proto_->GetName()] = std::move(proto_);
-  llvm::Function *the_function = get_function(p.GetName());
+  llvm::Function *the_function = the_module->getFunction(p.GetName());
+  if (!the_function) {
+    the_function = proto_->codegen();
+  }
   if (!the_function) {
     return nullptr;
   }
@@ -231,7 +243,10 @@ llvm::Function *FunctionAST::codegen() {
   llvm::DIFile *Unit = DBuilder->createFile(KSDbgInfo.TheCU->getFilename(),
                                             KSDbgInfo.TheCU->getDirectory());
   llvm::DIScope *FContext = Unit;
-  unsigned LineNo = p.GetName().length();
+  const unsigned LineNo =
+      p.getLine() > 0 ? static_cast<unsigned>(p.getLine()) : 1U;
+  const unsigned ColNo =
+      p.getCol() > 0 ? static_cast<unsigned>(p.getCol()) : 1U;
   unsigned ScopeLine = LineNo;
   llvm::DISubprogram *SP = DBuilder->createFunction(
       FContext, p.GetName(), llvm::StringRef(), Unit, LineNo,
@@ -262,7 +277,7 @@ llvm::Function *FunctionAST::codegen() {
 
     DBuilder->insertDeclare(
         Alloca, D, DBuilder->createExpression(),
-        llvm::DILocation::get(SP->getContext(), LineNo, 0, SP),
+        llvm::DILocation::get(SP->getContext(), LineNo, ColNo, SP),
         builder->GetInsertBlock());
 
     // Store the initial value into the alloca.
@@ -278,16 +293,38 @@ llvm::Function *FunctionAST::codegen() {
     // Finish off the function.
     builder->CreateRet(ret_val);
 
+    // Validate the generated code, checking for consistency.
+    if (llvm::verifyFunction(*the_function, &llvm::errs())) {
+      if (the_fam) {
+        the_fam->clear(*the_function, the_function->getName());
+      }
+      the_function->eraseFromParent();
+
+      if (p.is_binary_op())
+        BinopPrecedence.erase(static_cast<Token>(p.get_operator_name()));
+
+      KSDbgInfo.LexicalBlocks.pop_back();
+      return nullptr;
+    }
+
+    if (the_fpm && the_fam) {
+      the_fpm->run(*the_function, *the_fam);
+    }
+
+    if (p.GetName() != "__anon_expr") {
+      function_protos[p.GetName()] = std::move(proto_);
+    }
+
     // Pop off the lexical block for the function.
     KSDbgInfo.LexicalBlocks.pop_back();
-
-    // Validate the generated code, checking for consistency.
-    llvm::verifyFunction(*the_function);
 
     return the_function;
   }
 
   // Error reading body, remove function.
+  if (the_fam) {
+    the_fam->clear(*the_function, the_function->getName());
+  }
   the_function->eraseFromParent();
 
   if (p.is_binary_op())
@@ -404,7 +441,7 @@ llvm::Value *ForExprAST::codegen() {
 
   // Within the loop, the variable is defined equal to the PHI node.  If it
   // shadows an existing variable, we have to restore it, so save it now.
-  llvm::AllocaInst *OldVal = named_values[VarName];
+  llvm::AllocaInst *OldVal = lookup_named_value(VarName);
   named_values[VarName] = Alloca;
 
   // Emit the body of the loop.  This, like any other expr, can change the
@@ -502,7 +539,7 @@ llvm::Value *VarExprAST::codegen() {
 
     // Remember the old variable binding so that we can restore the binding when
     // we unrecurse.
-    OldBindings.push_back(named_values[VarName]);
+    OldBindings.push_back(lookup_named_value(VarName));
 
     // Remember this binding.
     named_values[VarName] = Alloca;

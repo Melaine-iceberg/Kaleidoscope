@@ -107,14 +107,12 @@ void InitializeModuleAndManagers() {
   the_pic = std::make_unique<llvm::PassInstrumentationCallbacks>();
   the_si =
       std::make_unique<llvm::StandardInstrumentations>(*the_context,
-                                                       /*DebugLogging*/ true);
+                                                       /*DebugLogging*/ false);
   the_si->registerCallbacks(*the_pic, the_mam.get());
 
   // Add transform passes.
-  // 暂时注释掉优化 Pass，专注于编译成功
-  /*
   // Promote allocas to registers.
-  the_fpm->addPass(llvm::PromoteMemToRegPass());
+  the_fpm->addPass(llvm::PromotePass());
   // Do simple "peephole" optimizations and bit-twiddling optzns.
   the_fpm->addPass(llvm::InstCombinePass());
   // Reassociate expressions.
@@ -123,10 +121,11 @@ void InitializeModuleAndManagers() {
   the_fpm->addPass(llvm::GVNPass());
   // Simplify the control flow graph (deleting unreachable blocks, etc).
   the_fpm->addPass(llvm::SimplifyCFGPass());
-  */
 
   // Register analysis passes used in these transform passes.
   llvm::PassBuilder pb;
+  pb.registerLoopAnalyses(*the_lam);
+  pb.registerCGSCCAnalyses(*the_cgam);
   pb.registerModuleAnalyses(*the_mam);
   pb.registerFunctionAnalyses(*the_fam);
   pb.crossRegisterProxies(*the_lam, *the_fam, *the_cgam, *the_mam);
@@ -187,8 +186,12 @@ void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
   if (auto FnAST = parse_top_level_expr()) {
     if (auto *OldFn = the_module->getFunction("__anon_expr")) {
+      if (the_fam) {
+        the_fam->clear(*OldFn, OldFn->getName());
+      }
       OldFn->eraseFromParent();
     }
+    function_protos.erase("__anon_expr");
     if (FnAST->codegen()) {
       // JIT 相关代码移除 - 简化版本只输出 IR
       std::fputs("Parsed a top-level expr:", stderr);

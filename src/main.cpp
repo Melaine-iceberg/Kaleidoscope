@@ -107,10 +107,10 @@ int main() {
   DBuilder = std::make_unique<llvm::DIBuilder>(*the_module);
 
   // Create the compile unit for the module.
-  // Currently down as "fib.ks" as a filename since we're redirecting stdin
-  // but we'd like actual source locations.
+  // The current frontend reads from stdin, so mark the compile unit as such
+  // instead of using a tutorial placeholder filename.
   KSDbgInfo.TheCU = DBuilder->createCompileUnit(
-      llvm::dwarf::DW_LANG_C, DBuilder->createFile("fib.ks", "."),
+      llvm::dwarf::DW_LANG_C, DBuilder->createFile("<stdin>", "."),
       "Kaleidoscope Compiler", false, "", 0);
 
   // Now run the main "interpreter loop".

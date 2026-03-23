@@ -10,6 +10,7 @@ extern Token cur_tok;
 /// ParsePrimary - This function parses primary expressions like numbers,
 /// identifiers, or parenthesized expressions.
 std::unique_ptr<ExprAST> ParseIfExpr() {
+  const SourceLocation if_loc = CurLoc;
   get_next_token(); // eat the if.
 
   // condition.
@@ -39,8 +40,7 @@ std::unique_ptr<ExprAST> ParseIfExpr() {
     return nullptr;
   }
 
-  // 使用全局 CurLoc
-  return std::make_unique<IfExprAST>(CurLoc, std::move(Cond), std::move(Then),
+  return std::make_unique<IfExprAST>(if_loc, std::move(Cond), std::move(Then),
                                      std::move(Else));
 }
 
@@ -48,6 +48,7 @@ std::unique_ptr<ExprAST> ParseIfExpr() {
 /// @return A unique pointer to the ForExprAST representing the parsed for
 /// expression, or nullptr on error.
 std::unique_ptr<ExprAST> ParseForExpr() {
+  const SourceLocation for_loc = CurLoc;
   get_next_token(); // eat the for.
 
   if (cur_tok != Token::k_tok_identifier) {
@@ -97,7 +98,7 @@ std::unique_ptr<ExprAST> ParseForExpr() {
     return nullptr;
   }
 
-  return std::make_unique<ForExprAST>(CurLoc, IdName, std::move(Start),
+  return std::make_unique<ForExprAST>(for_loc, IdName, std::move(Start),
                                       std::move(End), std::move(Step),
                                       std::move(Body));
 }
@@ -106,6 +107,7 @@ std::unique_ptr<ExprAST> ParseForExpr() {
 /// var identifier ('=' expression)? (',' identifier ('=' expression)?)* 'in'
 /// expression
 std::unique_ptr<ExprAST> ParseVarExpr() {
+  const SourceLocation var_loc = CurLoc;
   get_next_token(); // eat 'var'
 
   std::vector<std::pair<std::string, std::unique_ptr<ExprAST>>> VarNames;
@@ -148,6 +150,6 @@ std::unique_ptr<ExprAST> ParseVarExpr() {
   if (!Body)
     return nullptr;
 
-  return std::make_unique<VarExprAST>(CurLoc, std::move(VarNames),
+  return std::make_unique<VarExprAST>(var_loc, std::move(VarNames),
                                       std::move(Body));
 }

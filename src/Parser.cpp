@@ -31,7 +31,8 @@ std::unique_ptr<ExprAST> ParseExpression() {
 
 /// numberexpr ::= number
 std::unique_ptr<ExprAST> ParseNumberExpr() {
-  auto result = std::make_unique<NumberExprAST>(CurLoc, num_val);
+  const SourceLocation number_loc = CurLoc;
+  auto result = std::make_unique<NumberExprAST>(number_loc, num_val);
   get_next_token(); // consume the number
   return result;
 }
@@ -55,12 +56,14 @@ std::unique_ptr<ExprAST> ParseParenExpr() {
 ///   ::= identifier
 ///   ::= identifier '(' expression* ')'
 std::unique_ptr<ExprAST> ParseIdentifierExpr() {
+  const SourceLocation identifier_loc = CurLoc;
   std::string id_name{identifier_str}; // Remember the identifier name
 
   get_next_token(); // eat identifier.
 
   if (get_current_token() != static_cast<Token>('(')) { // Simple variable ref.
-    return std::make_unique<VariableExprAST>(CurLoc, std::move(id_name));
+    return std::make_unique<VariableExprAST>(identifier_loc,
+                                             std::move(id_name));
   }
 
   // Call.
@@ -91,7 +94,7 @@ std::unique_ptr<ExprAST> ParseIdentifierExpr() {
   // Eat the ')'.
   get_next_token();
 
-  return std::make_unique<CallExprAST>(CurLoc, std::move(id_name),
+  return std::make_unique<CallExprAST>(identifier_loc, std::move(id_name),
                                        std::move(args));
 }
 
@@ -138,6 +141,7 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(const int ExprPrec,
       return LHS;
     }
     // Okay, we know this is a binop.
+    const SourceLocation bin_op_loc = CurLoc;
     Token bin_op = get_current_token();
     get_next_token(); // eat binop
 
@@ -156,7 +160,7 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(const int ExprPrec,
     }
 
     // Merge LHS/RHS.
-    LHS = std::make_unique<BinaryExprAST>(CurLoc, bin_op, std::move(LHS),
+    LHS = std::make_unique<BinaryExprAST>(bin_op_loc, bin_op, std::move(LHS),
                                           std::move(rhs));
   } // loop around to the top of the while loop.
 }
@@ -167,6 +171,7 @@ std::unique_ptr<ExprAST> ParseBinOpRHS(const int ExprPrec,
 ///   ::= unary LETTER '(' id ')'
 /// @return A unique pointer to the parsed PrototypeAst, or nullptr on error.
 std::unique_ptr<PrototypeAST> ParsePrototype() {
+  const SourceLocation prototype_loc = CurLoc;
   std::string fn_name;
 
   unsigned Kind = 0; // 0 = identifier, 1 = unary, 2 = binary.
@@ -233,8 +238,8 @@ std::unique_ptr<PrototypeAST> ParsePrototype() {
     return LogErrorP("Invalid number of operands for operator");
   }
 
-  return std::make_unique<PrototypeAST>(fn_name, std::move(ArgNames), Kind != 0,
-                                        BinaryPrecedence);
+  return std::make_unique<PrototypeAST>(
+      prototype_loc, fn_name, std::move(ArgNames), Kind != 0, BinaryPrecedence);
 }
 
 /// definition ::= 'def' prototype expression
@@ -271,7 +276,7 @@ template <typename ExprType>
   requires std::derived_from<ExprType, ExprAST>
 std::unique_ptr<FunctionAST> WrapAsTopLevel(std::unique_ptr<ExprType> expr) {
   auto proto = std::make_unique<PrototypeAST>(
-      "__anon_expr", std::vector<std::string>{}, false, 0);
+      expr->getLocation(), "__anon_expr", std::vector<std::string>{}, false, 0);
   return std::make_unique<FunctionAST>(std::move(proto), std::move(expr));
 }
 
@@ -289,12 +294,16 @@ std::unique_ptr<PrototypeAST> LogErrorP(std::string_view str) {
 
 /// GetTokPrecedence - Get the precedence of the pending binary operator token.
 int GetTokPrecedence() {
-  Token cur_tok = get_current_token();
-  if (!isascii(static_cast<int>(cur_tok)))
+  const Token current_token = get_current_token();
+  if (!isascii(static_cast<int>(current_token)))
     return -1;
 
   // Make sure it's a declared binop.
-  const int tok_precedence = BinopPrecedence[cur_tok];
+  const auto it = BinopPrecedence.find(current_token);
+  if (it == BinopPrecedence.end()) {
+    return -1;
+  }
+  const int tok_precedence = it->second;
   if (tok_precedence <= 0) {
     return -1;
   }
@@ -327,9 +336,10 @@ static std::unique_ptr<ExprAST> ParseUnary() {
     return ParsePrimary();
 
   // If this is a unary operator, read it.
+  const SourceLocation unary_loc = CurLoc;
   int Opc = static_cast<int>(cur_tok);
   get_next_token();
   if (auto Operand = ParseUnary())
-    return std::make_unique<UnaryExprAST>(CurLoc, Opc, std::move(Operand));
+    return std::make_unique<UnaryExprAST>(unary_loc, Opc, std::move(Operand));
   return nullptr;
 }

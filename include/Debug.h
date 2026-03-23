@@ -15,21 +15,22 @@ class ExprAST; // 前置声明，避免与 AST.h 循环包含
 inline std::unique_ptr<llvm::DIBuilder> DBuilder;
 
 inline struct DebugInfo {
-	llvm::DICompileUnit *TheCU{};
-	llvm::DIType *DblTy{};
-	std::vector<llvm::DIScope *> LexicalBlocks;
+  llvm::DICompileUnit *TheCU{};
+  llvm::DIType *DblTy{};
+  std::vector<llvm::DIScope *> LexicalBlocks;
 
-	llvm::DIType *getDoubleTy();
+  llvm::DIType *getDoubleTy();
 
-	void emitLocation(ExprAST *AST);
+  void emitLocation(ExprAST *AST);
 } KSDbgInfo;
-// SourceLocation - This struct represents a source code location with line and column information.
+// SourceLocation - This struct represents a source code location with line and
+// column information.
 struct SourceLocation {
-	int Line;
-	int Col;
+  int Line;
+  int Col;
 };
 
-inline  SourceLocation CurLoc;
+inline SourceLocation CurLoc{1, 1};
 inline SourceLocation LexLoc{1, 0};
 
-#endif //KALEIDOSCOPE_DEBUG_H
+#endif // KALEIDOSCOPE_DEBUG_H

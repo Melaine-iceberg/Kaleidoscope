@@ -18,8 +18,9 @@ public:
 
   virtual llvm::Value *codegen() = 0; /// Generate LLVM code for this expression
 
-  int getLine() const { return loc_.Line; }
-  int getCol() const { return loc_.Col; }
+  [[nodiscard]] SourceLocation getLocation() const noexcept { return loc_; }
+  [[nodiscard]] int getLine() const noexcept { return loc_.Line; }
+  [[nodiscard]] int getCol() const noexcept { return loc_.Col; }
   virtual llvm::raw_ostream &dump(llvm::raw_ostream &out, int ind) {
     return out << ':' << getLine() << ':' << getCol() << '\n';
   }
@@ -98,17 +99,22 @@ public:
 /// which captures its name, and its argument names (thus implicitly the number
 /// of arguments the function takes).
 class PrototypeAST {
+  SourceLocation loc_;
   std::string name_;
   std::vector<std::string> args_;
   bool is_operator_{};
   unsigned precedence_{}; // Precedence if a binary op.
 
 public:
-  PrototypeAST(std::string name, std::vector<std::string> args,
-               const bool is_operator, const unsigned precedence) noexcept
-      : name_(std::move(name)), args_(std::move(args)),
+  PrototypeAST(SourceLocation loc, std::string name,
+               std::vector<std::string> args, const bool is_operator,
+               const unsigned precedence) noexcept
+      : loc_(loc), name_(std::move(name)), args_(std::move(args)),
         is_operator_(is_operator), precedence_(precedence) {}
 
+  [[nodiscard]] SourceLocation getLocation() const noexcept { return loc_; }
+  [[nodiscard]] int getLine() const noexcept { return loc_.Line; }
+  [[nodiscard]] int getCol() const noexcept { return loc_.Col; }
   [[nodiscard]] const std::string &GetName() const noexcept { return name_; }
 
   [[nodiscard]] const std::vector<std::string> &GetArgs() const noexcept {

@@ -18,18 +18,6 @@ llvm::DIType *DebugInfo::getDoubleTy() {
   return DblTy;
 }
 
-int advance() {
-  int LastChar = getchar();
-
-  if (LastChar == '\n' || LastChar == '\r') {
-    LexLoc.Line++;
-    LexLoc.Col = 0;
-  } else {
-    LexLoc.Col++;
-  }
-  return LastChar;
-}
-
 void DebugInfo::emitLocation(ExprAST *AST) {
   if (!AST)
     return builder->SetCurrentDebugLocation(llvm::DebugLoc());
